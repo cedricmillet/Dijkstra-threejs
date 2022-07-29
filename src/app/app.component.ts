@@ -83,9 +83,6 @@ export class AppComponent implements OnInit, AfterViewInit {
       
       //group.translateOnAxis(new THREE.Vector3(1,1,0), 0)
       that.scene.add(group);
-
-      
-      that.pathFinder.calculateGraph()
       
       const itinerary = that.pathFinder.getShortestPathBetween("A", "F")
       const curve = SVG_PathFinder.getCurveFromPoints(itinerary);

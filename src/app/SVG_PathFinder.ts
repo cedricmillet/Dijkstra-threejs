@@ -97,9 +97,13 @@ export class SVG_PathFinder {
      * @returns 
      */
     public getShortestPathBetween(startingNodeId:string, endNodeId:string) : THREE.Vector3[] {
+        //  Calculate graph if necessary
+        if(Object.keys(this.graph).length === 0) {
+            this.calculateGraph();
+        }
         //  Check Graph
         if(!this.graph || Object.keys(this.graph).length === 0)
-            throw new Error(`Unable to find path in invalid graph, please call calculateGraph() before.`);
+            throw new Error(`Unable to find path in invalid graph.`);
         //  Check start/end nodes
         if(!this.graph.hasOwnProperty(startingNodeId)) throw new Error(`Missing node#${startingNodeId} in provided graph`);
         if(!this.graph.hasOwnProperty(endNodeId)) throw new Error(`Missing node#${endNodeId} in provided graph`);
