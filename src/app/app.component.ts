@@ -45,6 +45,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.loadSVG();
     //  Run !
     this.animate();
+    this.scene.add(SVG_PathFinder.createAnimatedLine())
   }
 
   ngOnInit(): void {}

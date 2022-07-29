@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { SVGResultPaths } from "three/examples/jsm/loaders/SVGLoader";
 
 const DOT_PREFIX = "PATHFINDER_";
+const ANIMATED_LINE_TEXTURE_URL = "./assets/textures/line.png";
 
 export interface PathFinderPoint {
     position:THREE.Vector3;
@@ -139,6 +140,34 @@ export class SVG_PathFinder {
     }
 
 
+    //https://codepen.io/josema/pen/bZJQog
+    public static createAnimatedLine(   from:THREE.Vector3=new THREE.Vector3(0,0,0),
+                                        to:THREE.Vector3=new THREE.Vector3(4,4,4), 
+                                        lineWidth=0.5, lineHeight=0.06, repeatFactor=10) {
+        const textureLoader = new THREE.TextureLoader();
+        const texture = textureLoader.load(ANIMATED_LINE_TEXTURE_URL);
+        const geometry = new THREE.PlaneBufferGeometry(lineWidth, lineHeight);
+        const material = new THREE.MeshBasicMaterial({color: 0xffffff, map: texture});
+        const mesh = new THREE.Mesh(geometry, material)
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.x = lineWidth / 2;
+        const line = new THREE.Group()
+        line.add(mesh)
+        const detroyableTimer = setInterval(() => {
+            texture.offset.x -= 0.20
+        }, 50);
+
+        const distance = from.distanceTo(to);
+        const scaleFactorX = distance / mesh.geometry.parameters.width;
+        line.position.set(...from.toArray());
+        line.scale.set(scaleFactorX, 1, 1);
+        texture.repeat.set(distance * repeatFactor, 1);
+        line.rotation.y = -Math.atan2(to.z - from.z, to.x - from.x);
+
+
+        return line;
+    }
 }
 
 class Dijkstra {
