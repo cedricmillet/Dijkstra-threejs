@@ -7,5 +7,8 @@ This project was generated with [Angular CLI](https://github.com/angular/angular
 ## SVG Input
 ![SVG](https://github.com/cedricmillet/Dijkstra-threejs/blob/master/svg.png)
 
-## 3D Output :: Path from A to F
+## 3D Output :: Path from A to F (Spline Mode)
 ![OVERVIEW](https://github.com/cedricmillet/Dijkstra-threejs/blob/master/thumbnail.png)
+
+## 3D Output :: Path from A to F (Line Mode)
+![OVERVIEW](https://github.com/cedricmillet/Dijkstra-threejs/blob/master/line.png)

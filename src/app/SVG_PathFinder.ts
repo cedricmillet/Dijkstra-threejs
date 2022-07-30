@@ -40,6 +40,7 @@ export class SVG_PathFinder {
         }
         //  Extract svg attributes from SVGResultPaths
         const data = this.extractDataFromPath(path);
+        mesh.visible = false;
         //  Add
         this.points.push({position: new THREE.Vector3(), mesh, neighbors: data.neighbors, id: data.id});
     }
@@ -64,7 +65,7 @@ export class SVG_PathFinder {
 
     public getPathFrom(origin:THREE.Vector3, mode:'spline'|'line'='line') {
         const sourcePoint = this.getNearestPointFrom(origin);
-        const destinationPoint = this.points[0];
+        const destinationPoint = this.points[2];
         if(destinationPoint.id === sourcePoint.id) {
             console.warn(`same source/destination point`);
             return null;
@@ -80,7 +81,6 @@ export class SVG_PathFinder {
                 const current = path[i];
                 const next = path[i+1];
                 if(current && next) {
-
                     const line = Utils.createAnimatedLine(current, next)
                     group.add(line)
                 }
