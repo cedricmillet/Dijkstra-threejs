@@ -62,7 +62,7 @@ export class SVG_PathFinder {
         return nearest;
     }
 
-    public getPathFrom(origin:THREE.Vector3) {
+    public getPathFrom(origin:THREE.Vector3, mode:'spline'|'line'='line') {
         const sourcePoint = this.getNearestPointFrom(origin);
         const destinationPoint = this.points[0];
         if(destinationPoint.id === sourcePoint.id) {
@@ -70,8 +70,24 @@ export class SVG_PathFinder {
             return null;
         }
         const path = this.getShortestPathBetween(sourcePoint, destinationPoint);
-        const curve = SVG_PathFinder.getCurveFromPoints(path);
-        return curve;
+
+        const group = new THREE.Group();
+        if(mode === 'spline') {
+            const curve = SVG_PathFinder.getCurveFromPoints(path);
+            group.add(curve)
+        } else {
+            for(let i=0;i<path.length;i++) {
+                const current = path[i];
+                const next = path[i+1];
+                if(current && next) {
+
+                    const line = Utils.createAnimatedLine(current, next)
+                    group.add(line)
+                }
+            }
+
+        }
+        return group;
     }
 
     /**
@@ -169,34 +185,7 @@ export class SVG_PathFinder {
 
 
 
-    //https://codepen.io/josema/pen/bZJQog
-    private static createAnimatedLine(   from:THREE.Vector3=new THREE.Vector3(0,0,0),
-                                        to:THREE.Vector3=new THREE.Vector3(4,4,4), 
-                                        lineWidth=0.5, lineHeight=0.06, repeatFactor=10) {
-        const textureLoader = new THREE.TextureLoader();
-        const texture = textureLoader.load(ANIMATED_LINE_TEXTURE_URL);
-        const geometry = new THREE.PlaneBufferGeometry(lineWidth, lineHeight);
-        const material = new THREE.MeshBasicMaterial({color: 0xffffff, map: texture});
-        const mesh = new THREE.Mesh(geometry, material)
-        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-        mesh.rotation.x = -Math.PI / 2;
-        mesh.position.x = lineWidth / 2;
-        const line = new THREE.Group()
-        line.add(mesh)
-        const detroyableTimer = setInterval(() => {
-            texture.offset.x -= 0.20
-        }, 50);
-
-        const distance = from.distanceTo(to);
-        const scaleFactorX = distance / mesh.geometry.parameters.width;
-        line.position.set(...from.toArray());
-        line.scale.set(scaleFactorX, 1, 1);
-        texture.repeat.set(distance * repeatFactor, 1);
-        line.rotation.y = -Math.atan2(to.z - from.z, to.x - from.x);
-
-
-        return line;
-    }
+    
 
 
 }
@@ -226,6 +215,38 @@ export class Utils {
         const cube = new THREE.Mesh( geometry, material );
         cube.position.set(...position.toArray())
         return cube
+    }
+
+
+    //https://codepen.io/josema/pen/bZJQog
+    public static createAnimatedLine(   from:THREE.Vector3=new THREE.Vector3(0,0,0),
+                                        to:THREE.Vector3=new THREE.Vector3(4,4,4), 
+                                        lineWidth=0.5, lineHeight=0.06, repeatFactor=10) {
+        if(!from) throw new Error(`Invalid value:`+from);
+        if(!to) throw new Error(`Invalid value:`+to);
+        const textureLoader = new THREE.TextureLoader();
+        const texture = textureLoader.load(ANIMATED_LINE_TEXTURE_URL);
+        const geometry = new THREE.PlaneBufferGeometry(lineWidth, lineHeight);
+        const material = new THREE.MeshBasicMaterial({color: 0xffffff, map: texture});
+        const mesh = new THREE.Mesh(geometry, material)
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.x = lineWidth / 2;
+        const line = new THREE.Group()
+        line.add(mesh)
+        const detroyableTimer = setInterval(() => {
+            texture.offset.x -= 0.20
+        }, 50);
+
+        const distance = from.distanceTo(to);
+        const scaleFactorX = distance / mesh.geometry.parameters.width;
+        line.position.set(...from.toArray());
+        line.scale.set(scaleFactorX, 1, 1);
+        texture.repeat.set(distance * repeatFactor, 1);
+        line.rotation.y = -Math.atan2(to.z - from.z, to.x - from.x);
+
+
+        return line;
     }
 
 }
