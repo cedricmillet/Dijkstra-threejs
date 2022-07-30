@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls';
 import {SVGLoader, SVGResult} from 'three/examples/jsm/loaders/SVGLoader';
 import { AfterViewInit, Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
-import { SVG_PathFinder, Utils } from './SVG_PathFinder';
+import { SVG_PathFinder } from './SVG_PathFinder';
+import { Utils } from './Utils';
 
 @Component({
   selector: 'app-root',
