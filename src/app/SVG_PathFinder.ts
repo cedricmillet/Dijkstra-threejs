@@ -13,13 +13,108 @@ export interface PathFinderPoint {
 
 export class SVG_PathFinder {
 
+    //  Provided nodes & neighbors
     private points : PathFinderPoint[] = [];
 
-    constructor() {
+    //  Dynamically calculated
+    private graph : any = {}
 
+    constructor() {}
+
+    /*****************************************************************************
+     *                      PUBLIC
+    /*****************************************************************************/
+
+    /**
+     * Add node in our path finder system
+     * @param mesh 
+     */
+    public addPoint(mesh:THREE.Mesh, path:SVGResultPaths) {
+        //  Check mesh validity
+        if(!mesh.name) {
+            throw new Error(`Please provide a name to this mesh.`)
+        }
+        //  Check mesh unicity
+        if(this.points.map(p=>p.id).includes(mesh.name)) {
+            throw new Error(`Please provide an UNIQUE name, '${mesh.name}' already added.`);
+        }
+        //  Extract svg attributes from SVGResultPaths
+        const data = this.extractDataFromPath(path);
+        //  Add
+        this.points.push({position: new THREE.Vector3(), mesh, neighbors: data.neighbors, id: data.id});
     }
 
-    public getPoints = () => this.points;
+    /**
+     * Find closest SVG Point from a given (x,y,z) world position
+     * @param target 
+     */
+    public getNearestPointFrom(target:THREE.Vector3) {
+        if(this.points.length===0) throw new Error("Empty point array");
+        let nearest = this.points[0];
+        let nearestDist = this.points[0].position.distanceTo(target);
+        for(let point of this.points) {
+            const distance = point.position.distanceTo(target);
+            if(distance < nearestDist) {
+                nearestDist = distance;
+                nearest = point;
+            }
+        }
+        return nearest;
+    }
+
+    public getPathFrom(origin:THREE.Vector3) {
+        const sourcePoint = this.getNearestPointFrom(origin);
+        const destinationPoint = this.points[0];
+        if(destinationPoint.id === sourcePoint.id) {
+            console.warn(`same source/destination point`);
+            return null;
+        }
+        const path = this.getShortestPathBetween(sourcePoint, destinationPoint);
+        const curve = SVG_PathFinder.getCurveFromPoints(path);
+        return curve;
+    }
+
+    /**
+     * Recalculate graph (edge : distances between nodes)
+     */
+     public calculateGraph() {
+        //  Update mesh position field
+        for(let p of this.points)
+            p.position = Utils.calculateMeshPosition(p.mesh);
+        //  Calculate graph
+        this.graph = {} as any;
+        for(let point of this.points) {
+            let neighbors = {} as any;
+            for(let neighborId of point.neighbors) {
+                const neighbor = this.points.find(p=>p.id===neighborId)
+                if(!neighbor) throw new Error(`Unable to find neighbor#${neighborId}`);
+                neighbors[neighborId] = point.position.distanceTo(neighbor.position)
+            }
+            this.graph[point.id] = neighbors;
+        }
+    }
+
+    /**
+     * Is graph already calculated ?
+     * @returns boolean
+     */
+    public graphCalculated = () : boolean => Object.keys(this.graph).length>0;
+
+
+    /**
+     * Is provided path a part of svg pathfinder system ?
+     * @param path SVGResultPaths returned by SVGLoader
+     * @returns boolean
+     */
+    public static isPartOfPathFinder(path:SVGResultPaths) : boolean {
+        const data = (path.userData as any).node;
+        return data?.id && data.id.startsWith(DOT_PREFIX);
+    }
+
+    /*****************************************************************************
+     *                      PRIVATE
+    /*****************************************************************************/
+
 
     private extractDataFromPath(path:SVGResultPaths) {
         if(!path.userData || !(path.userData as any)?.node?.id)
@@ -35,61 +130,6 @@ export class SVG_PathFinder {
         }
     }
 
-    /**
-     * Add node in graph
-     * @param mesh 
-     */
-    public addPoint(mesh:THREE.Mesh, path:SVGResultPaths) {
-        const data = this.extractDataFromPath(path);
-        const position = SVG_PathFinder.calculateMeshPosition(mesh);
-        this.points.push({position, mesh, neighbors: data.neighbors, id: data.id});
-    }
-
-    /**
-     * 
-     * @param target 
-     */
-    public getNearestPointFrom(target:THREE.Vector3) : PathFinderPoint {
-        if(this.points.length===0) throw new Error("Empty point array");
-        let nearest = this.points[0];
-        let nearestDist = this.points[0].position.distanceTo(target);
-        for(let point of this.points) {
-            const distance = point.position.distanceTo(target);
-            if(distance < nearestDist) {
-                nearestDist = distance;
-                nearest = point;
-            }
-        }
-        return nearest;
-    }
-
-    /**
-     * 
-     */
-    public static isPartOfPathFinder(path:SVGResultPaths) : boolean {
-        const data = (path.userData as any).node;
-        return data?.id && data.id.startsWith(DOT_PREFIX);
-    }
-
-    private graph : any = {}
-
-    /**
-     * Recalculate graph (edge : distances between nodes)
-     */
-    public calculateGraph() {
-        this.graph = {} as any;
-        for(let point of this.points) {
-            let neighbors = {} as any;
-            for(let neighborId of point.neighbors) {
-                const neighbor = this.points.find(p=>p.id===neighborId)
-                if(!neighbor) throw new Error(`Unable to find neighbor#${neighborId}`);
-                neighbors[neighborId] = point.position.distanceTo(neighbor.position)
-            }
-            this.graph[point.id] = neighbors;
-        }
-    }
-
-    public getGraph = () => this.graph; 
 
     /**
      * Calculer le chemin de points nécéssaires 
@@ -97,42 +137,30 @@ export class SVG_PathFinder {
      * @param endNodeId 
      * @returns 
      */
-    public getShortestPathBetween(startingNodeId:string, endNodeId:string) : THREE.Vector3[] {
+    private getShortestPathBetween(startingNode:PathFinderPoint, endNode:PathFinderPoint) : THREE.Vector3[] {
         //  Calculate graph if necessary
         if(Object.keys(this.graph).length === 0) {
-            this.calculateGraph();
+            throw new Error(`Please call calculateGraph() before`)
         }
         //  Check Graph
         if(!this.graph || Object.keys(this.graph).length === 0)
             throw new Error(`Unable to find path in invalid graph.`);
         //  Check start/end nodes
-        if(!this.graph.hasOwnProperty(startingNodeId)) throw new Error(`Missing node#${startingNodeId} in provided graph`);
-        if(!this.graph.hasOwnProperty(endNodeId)) throw new Error(`Missing node#${endNodeId} in provided graph`);
+        if(!this.graph.hasOwnProperty(startingNode.id)) throw new Error(`Missing node#${startingNode.id} in provided graph`);
+        if(!this.graph.hasOwnProperty(endNode.id)) throw new Error(`Missing node#${endNode.id} in provided graph`);
         //  Calculate
-        const path = Dijkstra.findShortestPath(this.graph, startingNodeId, endNodeId);
+        const path = Dijkstra.findShortestPath(this.graph, startingNode.id, endNode.id);
         //  Return Path
         return path.map((nodeId:string) => (this.points.find(p => p.id === nodeId) as PathFinderPoint).position);
     }
 
     /**
-     * Calculer la position (x,y,z) d'un Mesh à partir de sa géométrie
-     * @param mesh 
-     * @returns 
-     */
-    public static calculateMeshPosition(mesh:THREE.Mesh) {
-        const box = new THREE.Box3().setFromObject(mesh);
-        const result = new THREE.Vector3()
-        box.getCenter(result);
-        return result;
-    }
-
-    /**
-     * Calculer une courbe qui passe par un ensemble de points donné
+     * Calculer une courbe qui passe par un ensemble de points donnés
      * @param points Tableau de points de dimension 3 (x,y,z)
      * @param color Couleur de la courbe
      * @returns 
      */
-    public static getCurveFromPoints(points: THREE.Vector3[], color:number=0xff0000) {
+    private static getCurveFromPoints(points: THREE.Vector3[], color:number=0xff0000) {
         const curve = new THREE.CatmullRomCurve3( points );
         const geometry = new THREE.BufferGeometry().setFromPoints( curve.getPoints( 50 ) );
         const material = new THREE.LineBasicMaterial( { color } );
@@ -140,8 +168,9 @@ export class SVG_PathFinder {
     }
 
 
+
     //https://codepen.io/josema/pen/bZJQog
-    public static createAnimatedLine(   from:THREE.Vector3=new THREE.Vector3(0,0,0),
+    private static createAnimatedLine(   from:THREE.Vector3=new THREE.Vector3(0,0,0),
                                         to:THREE.Vector3=new THREE.Vector3(4,4,4), 
                                         lineWidth=0.5, lineHeight=0.06, repeatFactor=10) {
         const textureLoader = new THREE.TextureLoader();
@@ -168,6 +197,37 @@ export class SVG_PathFinder {
 
         return line;
     }
+
+
+}
+
+export class Utils {
+    /**
+     * Calculer la position (x,y,z) d'un Mesh à partir de sa géométrie
+     * @param mesh 
+     * @returns 
+     */
+     public static calculateMeshPosition(mesh:THREE.Mesh|THREE.Group) {
+        const box = new THREE.Box3().setFromObject(mesh);
+        const result = new THREE.Vector3()
+        box.getCenter(result);
+        return result;
+    }
+
+
+    /**
+     * 
+     * @param size 
+     * @returns 
+     */
+    public static getDebugCube(position:THREE.Vector3, size=0.2) {
+        const geometry = new THREE.BoxGeometry( size, size, size );
+        const material = new THREE.MeshBasicMaterial( {color: 0x00ff00} );
+        const cube = new THREE.Mesh( geometry, material );
+        cube.position.set(...position.toArray())
+        return cube
+    }
+
 }
 
 class Dijkstra {
@@ -250,4 +310,7 @@ class Dijkstra {
 
         return shortestPath;
     };
+
+
+
 }

@@ -2,8 +2,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls';
 import {SVGLoader, SVGResult} from 'three/examples/jsm/loaders/SVGLoader';
 import { AfterViewInit, Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
-import { SVG_PathFinder } from './SVG_PathFinder';
-import { Box3 } from 'three';
+import { SVG_PathFinder, Utils } from './SVG_PathFinder';
 
 @Component({
   selector: 'app-root',
@@ -18,6 +17,7 @@ export class AppComponent implements OnInit, AfterViewInit {
   camera:THREE.Camera;
   controls:OrbitControls;
   pathFinder:SVG_PathFinder = new SVG_PathFinder();
+  parentGroup:THREE.Group = new THREE.Group();
 
   constructor() {
     this.scene = new THREE.Scene();
@@ -42,10 +42,14 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.camera.position.set(5,10,5);
     this.camera.lookAt(0,0,0);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.applyCommonTransformation(this.parentGroup)
+    this.scene.add(this.parentGroup);
     this.loadSVG();
     //  Run !
     this.animate();
-    this.scene.add(SVG_PathFinder.createAnimatedLine())
+    //this.scene.add(SVG_PathFinder.createAnimatedLine())
+    
+    this.enableRaycasting();
   }
 
   ngOnInit(): void {}
@@ -62,34 +66,26 @@ export class AppComponent implements OnInit, AfterViewInit {
     return [e.offsetWidth, e.offsetHeight]
   }
 
+
   private loadSVG() {
     const that = this;
     const loader = new SVGLoader();
     loader.load( `assets/img.svg`, function (data:SVGResult) {
       const paths = data.paths;
-      const group = new THREE.Group();
+      const group = new THREE.Group()
+      that.parentGroup.add(group);
       for(let path of paths) {
         const shapes = SVGLoader.createShapes(path);
         const geometry = new THREE.ExtrudeGeometry(shapes, {steps:1, depth:-5});
         const material = new THREE.MeshPhongMaterial({color: new THREE.Color(path.color), side: THREE.DoubleSide});
         const mesh = new THREE.Mesh(geometry, material);
+        mesh.name = (path.userData as any)?.node?.id;
         group.add(mesh);
-
+        
         if(SVG_PathFinder.isPartOfPathFinder(path)) {
           that.pathFinder.addPoint(mesh, path);
         }
       }
-
-      that.applyCommonTransformation(group);
-      
-      //group.translateOnAxis(new THREE.Vector3(1,1,0), 0)
-      that.scene.add(group);
-      
-      const itinerary = that.pathFinder.getShortestPathBetween("A", "F")
-      const curve = SVG_PathFinder.getCurveFromPoints(itinerary);
-      that.applyCommonTransformation(curve);
-      that.scene.add(curve);
-
     }, function(xhr:any) {
       console.log("loaded : ", xhr.loaded/xhr.total*100, "%");
     }, function(err) {
@@ -107,6 +103,41 @@ export class AppComponent implements OnInit, AfterViewInit {
     obj.rotateX(Math.PI/2);
     const s = 0.05;
     obj.scale.set(s,s,s)
+  }
+
+  private enableRaycasting() {
+    const that = this;
+    this.rendererContainer.nativeElement.addEventListener('mousedown', onMouseDown);
+    function onMouseDown(event:any) {
+      event.preventDefault();
+      const rect = that.renderer.domElement.getBoundingClientRect();
+      const x = ( ( event.clientX - rect.left ) / ( rect.right - rect.left ) ) * 2 - 1;
+      const y = - ( ( event.clientY - rect.top ) / ( rect.bottom - rect.top ) ) * 2 + 1;
+      const mouse = new THREE.Vector3(x, y, 0.5);
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, that.camera);
+      const intersects = raycaster.intersectObject(that.parentGroup);
+      if(intersects.length>0) {        
+        if(intersects[0].object instanceof THREE.Mesh) {
+          //  Emit event
+          that.onClickOnMesh(intersects[0].point)
+        }
+      }
+    }
+  }
+
+  private onClickOnMesh(origin:THREE.Vector3) {
+    //  Adds debug cube
+    const cube = Utils.getDebugCube(origin);
+    this.scene.add(cube);
+    //  Calculate graph if necessary
+    if(!this.pathFinder.graphCalculated()) {
+      this.pathFinder.calculateGraph();
+    }
+    //  Find path
+    const curve = this.pathFinder.getPathFrom(origin);
+    //  Add to 3D scene
+    if(curve) this.scene.add(curve);
   }
 }
 
