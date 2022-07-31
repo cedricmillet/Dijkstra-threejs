@@ -142,6 +142,7 @@ export class SVG_PathFinder {
         if(!id.startsWith(DOT_PREFIX)) throw new Error("id must starts with DOT_PREFIX" + id);
         
         const chain = id.substring(DOT_PREFIX.length).split('__');
+        if(chain.length !== 2) throw new Error(`Dot id must be on followinf format : 'DOT_PREFIX_ID__neighbor1-neighbor2-...'`)
         return {
             id: chain[0],
             neighbors: chain[1].split('-')
